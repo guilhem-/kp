@@ -1,0 +1,43 @@
+# CI workflow to publish the PoC to GitHub Pages
+#
+# After pushing to the default branch, the action creates/updates the
+# special `gh-pages` branch and serves everything in the repository
+# root (including kp.html, images, etc.).
+#
+# The published site will be reachable at:
+#   https://<github-user>.github.io/<repository>/
+#
+# No build step is required – we only upload the static files.
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [ "main", "master" ]
+
+permissions:
+  id-token: write        # required by actions/deploy-pages
+  contents: read
+  pages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>legit</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: #f4f4f4;
+      font-family: Arial, sans-serif;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      text-align: center;
+      width: 400px;
+    }
+    input, textarea {
+      display: block;
+      margin: 10px auto;
+      padding: 8px;
+      width: 80%;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-family: monospace;
+    }
+    button {
+      margin-top: 10px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    #status {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    #log {
+      margin-top: 15px;
+      height: 120px;
+      resize: none;
+      overflow-y: scroll;
+    }
+    canvas {
+      margin-top: 20px;
+      width: 100% !important;
+      height: 200px !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <input type="text" id="login" placeholder="Login">
+    <input type="password" id="password" placeholder="Password">
+    <button id="enterBtn">Enter</button>
+
+    <div id="status">Ctrl: UP | Alt: UP</div>
+    <textarea id="log" readonly placeholder="Keyboard events will appear here..."></textarea>
+
+    <canvas id="chart"></canvas>
+  </div>
+
+  <script>
+    let lastShortcutTime = null;
+    let firstKeyCaptured = false;
+
+    const series = {
+      legit: [],
+      leak: []
+    };
+
+    // Chart.js setup
+    const ctx = document.getElementById('chart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'legit', data: [], borderColor: 'blue', fill: false },
+          { label: 'leak', data: [], borderColor: 'red', fill: false }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: { title: { display: true, text: 'Measurement #'} },
+          y: { title: { display: true, text: 'ms since Ctrl+Alt'} }
+        }
+      }
+    });
+
+    function updateChart() {
+      chart.data.labels = Array.from(
+        { length: Math.max(series.legit.length, series.leak.length) },
+        (_, i) => i + 1
+      );
+      chart.data.datasets[0].data = series.legit;
+      chart.data.datasets[1].data = series.leak;
+      chart.update();
+    }
+
+    function showCredentials() {
+      // clear + refocus
+      document.getElementById('login').value = '';
+      document.getElementById('password').value = '';
+      document.getElementById('login').focus();
+      firstKeyCaptured = false;
+    }
+
+    // Button click handler
+    document.getElementById('enterBtn').addEventListener('click', showCredentials);
+
+    // Enter key handler for inputs
+    document.querySelectorAll('#login, #password').forEach(input => {
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          showCredentials();
+        }
+      });
+    });
+
+    // Detect first key after shortcut in password field -> measure here!
+    document.getElementById('password').addEventListener('keydown', function(e) {
+      if (!firstKeyCaptured && lastShortcutTime) {
+        const diff = Date.now() - lastShortcutTime;
+        const login = document.getElementById('login').value.trim();
+        if (login === 'legit') {
+          series.legit.push(diff);
+        } else if (login === 'leak') {
+          series.leak.push(diff);
+        }
+        updateChart();
+        firstKeyCaptured = true; // avoid measuring multiple times
+      }
+    });
+
+    // Status display
+    const statusDiv = document.getElementById('status');
+    function updateStatus(ctrl, alt) {
+      statusDiv.textContent = `Ctrl: ${ctrl ? 'DOWN' : 'UP'} | Alt: ${alt ? 'DOWN' : 'UP'}`;
+    }
+
+    // Keyboard log
+    const logBox = document.getElementById('log');
+    function logEvent(e) {
+      const msg = `${e.type.toUpperCase()} - key="${e.key}" ctrl=${e.ctrlKey} alt=${e.altKey}`;
+      logBox.value += msg + "\n";
+      logBox.scrollTop = logBox.scrollHeight;
+      updateStatus(e.ctrlKey, e.altKey);
+    }
+
+    const originalTitle = document.title;
+
+    // Global keyboard handlers
+    document.addEventListener('keydown', function(e) {
+      logEvent(e);
+      // Ctrl+Alt title change
+      if (e.ctrlKey && e.altKey) {
+        lastShortcutTime = Date.now();
+        firstKeyCaptured = false;
+
+        document.title = 'leak';
+        setTimeout(() => {
+          document.title = originalTitle;
+        }, 1000);
+      }
+    });
+    document.addEventListener('keyup', logEvent);
+  </script>
+</body>
+</html>
